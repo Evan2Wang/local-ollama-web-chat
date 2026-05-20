@@ -35,16 +35,122 @@ local-ollama-web-chat/
 
 1. 安装 Python 3.11+。
 2. 安装 Node.js 20+。
-3. 启动 Ollama，并确保本地模型已安装，例如：
+3. 如果使用真实模型，目标电脑需要安装并启动 Ollama。
+
+## 场景 A：目标电脑已经安装 Ollama
+
+这是正式使用方式。你需要启动 3 个东西：
+
+1. Ollama 服务
+2. 本项目后端
+3. 本项目前端
+
+### 1. 克隆项目
+
+```powershell
+git clone https://github.com/Evan2Wang/local-ollama-web-chat.git
+cd local-ollama-web-chat
+```
+
+### 2. 确认 Ollama 可用
+
+先确认 Ollama 已安装，并拉取目标模型：
 
 ```powershell
 ollama pull qwen3.6:35b
+```
+
+启动 Ollama 服务：
+
+```powershell
 ollama serve
 ```
 
-Ollama 默认地址是 `http://localhost:11434`。
+Ollama 默认地址是：
 
-## 没有 Ollama 时的 Mock 测试模式
+```text
+http://localhost:11434
+```
+
+可以在浏览器或 PowerShell 里检查模型列表：
+
+```powershell
+Invoke-RestMethod http://localhost:11434/api/tags
+```
+
+如果能看到模型列表，说明 Ollama 已经正常。
+
+### 3. 配置本项目
+
+复制 `.env.example` 为 `.env`：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+默认配置已经适配本机 Ollama：
+
+```env
+LOCAL_CHAT_OLLAMA_BASE_URL=http://localhost:11434
+LOCAL_CHAT_DEFAULT_MODEL=qwen3.6:35b
+LOCAL_CHAT_MAX_FILE_CHARS=30000
+```
+
+如果你的模型名不是 `qwen3.6:35b`，把 `LOCAL_CHAT_DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
+
+### 4. 启动后端
+
+双击：
+
+```text
+start_backend.bat
+```
+
+或手动执行：
+
+```powershell
+cd D:\local-ollama-web-chat\backend
+python -m venv .venv
+.\.venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+健康检查：
+
+```text
+http://127.0.0.1:8000/api/health
+```
+
+### 5. 启动前端
+
+双击：
+
+```text
+start_frontend.bat
+```
+
+或手动执行：
+
+```powershell
+cd D:\local-ollama-web-chat\frontend
+npm install
+npm run dev
+```
+
+浏览器打开：
+
+```text
+http://127.0.0.1:5173
+```
+
+此时完整链路是：
+
+```text
+浏览器前端 5173 -> FastAPI 后端 8000 -> Ollama 11434 -> 本地模型
+```
+
+## 场景 B：没有 Ollama，只测试前后端
 
 如果当前电脑没有安装 Ollama，可以先启动内置 Mock 服务完成前后端测试。Mock 服务监听同样的地址 `http://127.0.0.1:11434`，并模拟：
 
@@ -71,60 +177,14 @@ Mock 会返回 `qwen3.6:35b` 和 `mock-vision:latest` 两个模型。选择 `moc
 
 目标电脑上有真实 Ollama 后，关闭 Mock，启动真实 Ollama 即可，前后端代码不需要调整。
 
-## 配置
+## 视觉模型配置
 
-复制 `.env.example` 为 `.env`，按需修改：
+普通文本模型不能直接识图。只有模型名命中 `LOCAL_CHAT_VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。
 
-```powershell
-Copy-Item .env.example .env
-```
-
-常用配置：
-
-```env
-LOCAL_CHAT_OLLAMA_BASE_URL=http://localhost:11434
-LOCAL_CHAT_DEFAULT_MODEL=qwen3.6:35b
-LOCAL_CHAT_MAX_FILE_CHARS=30000
-```
-
-如果你有视觉模型，把模型名关键字加入：
+如果你有视觉模型，把模型名关键字加入 `.env`：
 
 ```env
 LOCAL_CHAT_VISION_MODEL_KEYWORDS=llava,qwen-vl,qwen2-vl,minicpm-v
-```
-
-## 启动后端
-
-双击 `start_backend.bat`，或手动执行：
-
-```powershell
-cd D:\local-ollama-web-chat\backend
-python -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-健康检查：
-
-```text
-http://127.0.0.1:8000/api/health
-```
-
-## 启动前端
-
-双击 `start_frontend.bat`，或手动执行：
-
-```powershell
-cd D:\local-ollama-web-chat\frontend
-npm install
-npm run dev
-```
-
-浏览器打开：
-
-```text
-http://127.0.0.1:5173
 ```
 
 ## 局域网访问
