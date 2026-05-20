@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     @field_validator("ollama_base_url")
     @classmethod
     def normalize_ollama_base_url(cls, value: str) -> str:
-        normalized = value.strip().rstrip("/")
+        normalized = value.strip().replace("://localhost", "://127.0.0.1").rstrip("/")
         if normalized.endswith("/api"):
             normalized = normalized[:-4]
         return normalized

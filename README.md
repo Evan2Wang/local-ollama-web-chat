@@ -69,13 +69,13 @@ ollama serve
 Ollama 默认地址是：
 
 ```text
-http://localhost:11434
+http://127.0.0.1:11434
 ```
 
 可以在浏览器或 PowerShell 里检查模型列表：
 
 ```powershell
-Invoke-RestMethod http://localhost:11434/api/tags
+Invoke-RestMethod http://127.0.0.1:11434/api/tags
 ```
 
 如果能看到模型列表，说明 Ollama 已经正常。
