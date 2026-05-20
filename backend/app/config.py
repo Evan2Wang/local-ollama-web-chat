@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,14 +9,28 @@ DATA_DIR = ROOT_DIR / "data"
 
 
 class Settings(BaseSettings):
-    ollama_base_url: str = "http://localhost:11434"
-    default_model: str = "qwen3.6:35b"
-    system_prompt: str = "你是一个本地中文助手，请用中文回答，结构清晰。"
-    max_context_messages: int = 40
-    max_file_chars: int = 30000
-    vision_model_keywords: str = "llava,bakllava,moondream,qwen-vl,qwen2-vl,qwen2.5vl,qwen2.5-vl,minicpm-v,gemma3"
+    ollama_base_url: str = Field(
+        default="http://127.0.0.1:11434",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "LOCAL_CHAT_OLLAMA_BASE_URL"),
+    )
+    default_model: str = Field(default="qwen3.6:35b-a3b", validation_alias=AliasChoices("DEFAULT_MODEL", "LOCAL_CHAT_DEFAULT_MODEL"))
+    system_prompt: str = Field(default="你是一个本地中文助手，请用中文回答，结构清晰。", validation_alias=AliasChoices("SYSTEM_PROMPT", "LOCAL_CHAT_SYSTEM_PROMPT"))
+    max_context_messages: int = Field(default=40, validation_alias=AliasChoices("MAX_CONTEXT_MESSAGES", "LOCAL_CHAT_MAX_CONTEXT_MESSAGES"))
+    max_file_chars: int = Field(default=30000, validation_alias=AliasChoices("MAX_FILE_CHARS", "LOCAL_CHAT_MAX_FILE_CHARS"))
+    vision_model_keywords: str = Field(
+        default="llava,bakllava,moondream,qwen-vl,qwen2-vl,qwen2.5vl,qwen2.5-vl,minicpm-v,gemma3",
+        validation_alias=AliasChoices("VISION_MODEL_KEYWORDS", "LOCAL_CHAT_VISION_MODEL_KEYWORDS"),
+    )
 
-    model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_prefix="LOCAL_CHAT_")
+    model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", extra="ignore")
+
+    @field_validator("ollama_base_url")
+    @classmethod
+    def normalize_ollama_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        if normalized.endswith("/api"):
+            normalized = normalized[:-4]
+        return normalized
 
     @property
     def database_url(self) -> str:

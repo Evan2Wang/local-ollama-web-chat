@@ -10,17 +10,67 @@ def model_supports_vision(model: str) -> bool:
     return any(keyword.strip() and keyword.strip() in name for keyword in settings.vision_model_keywords.lower().split(","))
 
 
+def ollama_url(path: str) -> str:
+    return f"{settings.ollama_base_url}{path}"
+
+
+def ollama_error_payload(exc: Exception, url: str) -> dict:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return {
+            "ok": False,
+            "error": f"Ollama returned HTTP {exc.response.status_code}",
+            "url": url,
+            "status_code": exc.response.status_code,
+            "detail": exc.response.text,
+        }
+    if isinstance(exc, httpx.RequestError):
+        return {
+            "ok": False,
+            "error": exc.__class__.__name__,
+            "url": url,
+            "status_code": None,
+            "detail": str(exc),
+        }
+    return {
+        "ok": False,
+        "error": exc.__class__.__name__,
+        "url": url,
+        "status_code": None,
+        "detail": str(exc),
+    }
+
+
 async def list_models() -> list[dict]:
+    data = await get_tags()
+    return data.get("models", [])
+
+
+async def get_tags() -> dict:
+    url = ollama_url("/api/tags")
     async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.get(f"{settings.ollama_base_url}/api/tags")
+        response = await client.get(url)
         response.raise_for_status()
-        return response.json().get("models", [])
+        return response.json()
+
+
+async def chat_once(model: str, content: str) -> dict:
+    url = ollama_url("/api/chat")
+    payload = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "user", "content": content}],
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
 
 
 async def stream_chat(model: str, messages: list[dict]):
     payload = {"model": model, "messages": messages, "stream": True}
+    url = ollama_url("/api/chat")
     async with httpx.AsyncClient(timeout=None) as client:
-        async with client.stream("POST", f"{settings.ollama_base_url}/api/chat", json=payload) as response:
+        async with client.stream("POST", url, json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if not line:

@@ -91,12 +91,19 @@ Copy-Item .env.example .env
 默认配置已经适配本机 Ollama：
 
 ```env
-LOCAL_CHAT_OLLAMA_BASE_URL=http://localhost:11434
-LOCAL_CHAT_DEFAULT_MODEL=qwen3.6:35b
-LOCAL_CHAT_MAX_FILE_CHARS=30000
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+DEFAULT_MODEL=qwen3.6:35b-a3b
+MAX_FILE_CHARS=30000
 ```
 
-如果你的模型名不是 `qwen3.6:35b`，把 `LOCAL_CHAT_DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
+注意：`OLLAMA_BASE_URL` 不要带 `/api`。后端会自动拼接：
+
+```text
+GET  {OLLAMA_BASE_URL}/api/tags
+POST {OLLAMA_BASE_URL}/api/chat
+```
+
+如果你的模型名不是 `qwen3.6:35b-a3b`，把 `DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
 
 ### 4. 启动后端
 
@@ -184,7 +191,7 @@ Mock 会返回 `qwen3.6:35b` 和 `mock-vision:latest` 两个模型。选择 `moc
 如果你有视觉模型，把模型名关键字加入 `.env`：
 
 ```env
-LOCAL_CHAT_VISION_MODEL_KEYWORDS=llava,qwen-vl,qwen2-vl,minicpm-v
+VISION_MODEL_KEYWORDS=llava,qwen-vl,qwen2-vl,minicpm-v
 ```
 
 ## 局域网访问
