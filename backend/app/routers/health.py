@@ -16,6 +16,7 @@ def health_config():
     return {
         "ollama_base_url": settings.ollama_base_url,
         "default_model": settings.default_model,
+        "ollama_think": settings.ollama_think,
         "max_file_chars": settings.max_file_chars,
         "auth_enabled": settings.auth_enabled,
     }

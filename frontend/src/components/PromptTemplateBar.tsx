@@ -37,7 +37,13 @@ export function PromptTemplateBar({
     <section className="prompt-area" aria-label="快捷提示词">
       <div className="prompt-buttons">
         {templates.filter((item) => item.enabled).map((item) => (
-          <button type="button" key={item.id} onClick={() => onInsert(item.content)} title={item.content}>
+          <button
+            type="button"
+            key={item.id}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onInsert(item.content)}
+            title={item.content}
+          >
             {item.name}
           </button>
         ))}

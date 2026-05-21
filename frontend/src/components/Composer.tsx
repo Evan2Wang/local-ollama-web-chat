@@ -1,7 +1,11 @@
 import { Paperclip, Send, X } from "lucide-react";
-import { ChangeEvent, KeyboardEvent, useRef } from "react";
+import { ChangeEvent, KeyboardEvent, forwardRef, useImperativeHandle, useRef } from "react";
 import type { Attachment } from "../types/chat";
 import { AttachmentPreview } from "./AttachmentPreview";
+
+export type ComposerHandle = {
+  focusInput: () => void;
+};
 
 type Props = {
   attachments: Attachment[];
@@ -13,8 +17,16 @@ type Props = {
   onSend: (content: string) => void;
 };
 
-export function Composer({ attachments, disabled, value, onValueChange, onFiles, onRemoveAttachment, onSend }: Props) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
+  { attachments, disabled, value, onValueChange, onFiles, onRemoveAttachment, onSend },
+  ref
+) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusInput: () => textareaRef.current?.focus()
+  }), []);
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     if (event.target.files?.length) onFiles(Array.from(event.target.files));
@@ -43,6 +55,7 @@ export function Composer({ attachments, disabled, value, onValueChange, onFiles,
           <Paperclip className="composer-action-icon" />
         </button>
         <textarea
+          ref={textareaRef}
           rows={1}
           value={value}
           disabled={disabled}
@@ -64,4 +77,4 @@ export function Composer({ attachments, disabled, value, onValueChange, onFiles,
       </div>
     </footer>
   );
-}
+});

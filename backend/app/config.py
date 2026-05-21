@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OLLAMA_BASE_URL", "LOCAL_CHAT_OLLAMA_BASE_URL"),
     )
     default_model: str = Field(default="qwen3.6:35b-a3b", validation_alias=AliasChoices("DEFAULT_MODEL", "LOCAL_CHAT_DEFAULT_MODEL"))
+    ollama_think: bool = Field(default=True, validation_alias=AliasChoices("OLLAMA_THINK", "LOCAL_CHAT_OLLAMA_THINK"))
     auth_enabled: bool = Field(default=True, validation_alias=AliasChoices("AUTH_ENABLED", "LOCAL_CHAT_AUTH_ENABLED"))
     app_token: str = Field(default="your-local-secret-token", validation_alias=AliasChoices("APP_TOKEN", "LOCAL_CHAT_APP_TOKEN"))
     system_prompt: str = Field(default="你是一个本地中文助手，请用中文回答，结构清晰。", validation_alias=AliasChoices("SYSTEM_PROMPT", "LOCAL_CHAT_SYSTEM_PROMPT"))

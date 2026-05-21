@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity } from "lucide-react";
 import {
   createConversation,
@@ -24,7 +24,7 @@ import {
 } from "../api/client";
 import { AttachmentDetailPanel } from "../components/AttachmentDetailPanel";
 import { ChatWindow } from "../components/ChatWindow";
-import { Composer } from "../components/Composer";
+import { Composer, type ComposerHandle } from "../components/Composer";
 import { DiagnosticsPanel } from "../components/DiagnosticsPanel";
 import { LoginPage } from "../components/LoginPage";
 import { ModelSelector } from "../components/ModelSelector";
@@ -63,8 +63,12 @@ export function Home() {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const composerRef = useRef<ComposerHandle>(null);
 
   const activeConversation = useMemo(() => conversations.find((item) => item.id === activeId), [activeId, conversations]);
+  const focusComposer = useCallback(() => {
+    window.requestAnimationFrame(() => composerRef.current?.focusInput());
+  }, []);
 
   const refreshConversations = useCallback(async () => {
     const list = await fetchConversations();
@@ -106,9 +110,11 @@ export function Home() {
         setPendingAttachments((items) => [...items, ...uploaded]);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        focusComposer();
       }
     },
-    [ensureConversation]
+    [ensureConversation, focusComposer]
   );
 
   const handleSend = useCallback(
@@ -241,12 +247,13 @@ export function Home() {
       }
       if (files.length) {
         event.preventDefault();
+        focusComposer();
         handleFiles(files);
       }
     }
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [handleFiles]);
+  }, [focusComposer, handleFiles]);
 
   useEffect(() => {
     function onDragOver(event: DragEvent) {
@@ -260,7 +267,10 @@ export function Home() {
       event.preventDefault();
       setDragging(false);
       const files = Array.from(event.dataTransfer?.files || []);
-      if (files.length) handleFiles(files);
+      if (files.length) {
+        focusComposer();
+        handleFiles(files);
+      }
     }
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("dragleave", onDragLeave);
@@ -270,7 +280,7 @@ export function Home() {
       window.removeEventListener("dragleave", onDragLeave);
       window.removeEventListener("drop", onDrop);
     };
-  }, [handleFiles]);
+  }, [focusComposer, handleFiles]);
 
   const openAttachment = useCallback(async (id: string) => {
     setError("");
@@ -338,7 +348,10 @@ export function Home() {
             <footer className="composer-stack">
               <PromptTemplateBar
                 templates={templates}
-                onInsert={(content) => setComposerValue((value) => value ? `${value}\n\n${content}` : content)}
+                onInsert={(content) => {
+                  setComposerValue((value) => value ? `${value}\n\n${content}` : content);
+                  focusComposer();
+                }}
                 onCreate={async (draft) => {
                   await createPromptTemplate({ ...draft, sort_order: templates.length + 1, enabled: true });
                   await refreshTemplates();
@@ -353,6 +366,7 @@ export function Home() {
                 }}
               />
               <Composer
+                ref={composerRef}
                 attachments={pendingAttachments}
                 disabled={busy}
                 value={composerValue}

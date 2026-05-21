@@ -65,6 +65,7 @@ def test_health_config_reports_local_runtime_settings(client: TestClient):
     assert response.json() == {
         "ollama_base_url": "http://127.0.0.1:11434",
         "default_model": settings.default_model,
+        "ollama_think": settings.ollama_think,
         "max_file_chars": settings.max_file_chars,
         "auth_enabled": False,
     }

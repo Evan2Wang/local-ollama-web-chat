@@ -55,6 +55,7 @@ export function DiagnosticsPanel({ onBack }: { onBack: () => void }) {
         <dl className="config-grid">
           <dt>OLLAMA_BASE_URL</dt><dd>{config.ollama_base_url}</dd>
           <dt>DEFAULT_MODEL</dt><dd>{config.default_model}</dd>
+          <dt>OLLAMA_THINK</dt><dd>{String(config.ollama_think)}</dd>
           <dt>MAX_FILE_CHARS</dt><dd>{config.max_file_chars}</dd>
           <dt>AUTH_ENABLED</dt><dd>{String(config.auth_enabled)}</dd>
           <dt>本地模型</dt><dd>{ollama?.models?.map((model) => model.name).join("，") || "-"}</dd>

@@ -98,6 +98,7 @@ Copy-Item .env.example .env
 ```env
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 DEFAULT_MODEL=qwen3.6:35b-a3b
+OLLAMA_THINK=true
 AUTH_ENABLED=true
 APP_TOKEN=your-local-secret-token
 MAX_FILE_CHARS=30000
@@ -111,6 +112,12 @@ POST {OLLAMA_BASE_URL}/api/chat
 ```
 
 如果你的模型名不是 `qwen3.6:35b-a3b`，把 `DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
+
+`OLLAMA_THINK=true` 会让后端向 Ollama 发送思考模式请求。支持思考的模型会先完成推理再返回最终回答；如需更快的非思考回复，可改为：
+
+```env
+OLLAMA_THINK=false
+```
 
 `AUTH_ENABLED=true` 时，前端首次打开会要求输入 `APP_TOKEN`。Token 仅保存在当前浏览器的 `localStorage`，后续 API 请求会带 `Authorization: Bearer <token>`。本地单机调试可改为：
 

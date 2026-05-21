@@ -61,7 +61,7 @@ async def chat_once(model: str, content: str) -> dict:
     payload = {
         "model": model,
         "stream": False,
-        "think": False,
+        "think": settings.ollama_think,
         "messages": [{"role": "user", "content": content}],
     }
     async with httpx.AsyncClient(timeout=CHAT_TIMEOUT, trust_env=False) as client:
@@ -71,7 +71,7 @@ async def chat_once(model: str, content: str) -> dict:
 
 
 async def stream_chat(model: str, messages: list[dict]):
-    payload = {"model": model, "messages": messages, "stream": True, "think": False}
+    payload = {"model": model, "messages": messages, "stream": True, "think": settings.ollama_think}
     url = ollama_url("/api/chat")
     async with httpx.AsyncClient(timeout=CHAT_TIMEOUT, trust_env=False) as client:
         async with client.stream("POST", url, json=payload) as response:

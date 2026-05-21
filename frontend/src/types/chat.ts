@@ -72,6 +72,7 @@ export type ConversationSearchResult = {
 export type HealthConfig = {
   ollama_base_url: string;
   default_model: string;
+  ollama_think: boolean;
   max_file_chars: number;
   auth_enabled: boolean;
 };
