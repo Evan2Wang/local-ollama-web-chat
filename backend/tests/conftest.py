@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.database import Base, get_db
+from app.config import settings
 from app.main import app
 from app.routers import chat as chat_router
 from app.services import context_builder, file_parser
@@ -28,6 +29,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
 
     app.dependency_overrides[get_db] = override_db
     monkeypatch.setattr(chat_router, "SessionLocal", testing_session)
+    monkeypatch.setattr(settings, "auth_enabled", False)
     monkeypatch.setattr(file_store, "DATA_DIR", tmp_path)
     monkeypatch.setattr(file_parser, "DATA_DIR", tmp_path)
     monkeypatch.setattr(context_builder, "DATA_DIR", tmp_path)

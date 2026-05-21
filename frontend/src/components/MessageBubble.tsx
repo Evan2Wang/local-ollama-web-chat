@@ -5,7 +5,7 @@ import { copyMarkdown, copyRichText } from "../utils/clipboard";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-export function MessageBubble({ message }: { message: Message }) {
+export function MessageBubble({ message, onOpenAttachment }: { message: Message; onOpenAttachment: (id: string) => void }) {
   const [copiedMode, setCopiedMode] = useState<"markdown" | "rich" | null>(null);
   const bubbleRef = useRef<HTMLElement>(null);
   const isUser = message.role === "user";
@@ -46,7 +46,7 @@ export function MessageBubble({ message }: { message: Message }) {
           )}
         </div>
       </div>
-      <AttachmentPreview attachments={message.attachments || []} />
+      <AttachmentPreview attachments={message.attachments || []} onOpen={onOpenAttachment} />
       {isUser ? <p className="plain-message">{message.content}</p> : <MarkdownRenderer content={message.content} />}
     </article>
   );

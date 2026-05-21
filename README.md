@@ -5,12 +5,17 @@
 ## 功能
 
 - 读取本地 Ollama 模型列表
+- 可选本地 Token 门禁，适合局域网访问
 - 多轮对话和 SQLite 历史记录
+- 会话搜索，支持标题、消息内容和附件文件名
+- 内置快捷提示词并支持自定义模板管理
 - Markdown、表格、代码块渲染和复制
 - `Ctrl+V` 粘贴图片/文件
 - 拖拽上传图片/文件
 - 支持 `txt`、`md`、`csv`、`pdf`、`docx`、`pptx`、`xlsx` 解析后参与对话
+- 文件附件支持解析文本预览、截断信息和重新解析
 - 支持 `png`、`jpg`、`jpeg`、`webp` 图片附件；视觉模型会以 Ollama `images` 数组发送
+- Ollama 诊断页展示配置、模型列表和 `/api/tags`、`/api/chat` 测试结果
 
 ## 目录
 
@@ -93,6 +98,8 @@ Copy-Item .env.example .env
 ```env
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 DEFAULT_MODEL=qwen3.6:35b-a3b
+AUTH_ENABLED=true
+APP_TOKEN=your-local-secret-token
 MAX_FILE_CHARS=30000
 ```
 
@@ -104,6 +111,12 @@ POST {OLLAMA_BASE_URL}/api/chat
 ```
 
 如果你的模型名不是 `qwen3.6:35b-a3b`，把 `DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
+
+`AUTH_ENABLED=true` 时，前端首次打开会要求输入 `APP_TOKEN`。Token 仅保存在当前浏览器的 `localStorage`，后续 API 请求会带 `Authorization: Bearer <token>`。本地单机调试可改为：
+
+```env
+AUTH_ENABLED=false
+```
 
 ### 4. 启动后端
 
@@ -127,6 +140,15 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```text
 http://127.0.0.1:8000/api/health
+```
+
+诊断接口：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health/config
+Invoke-RestMethod http://127.0.0.1:8000/api/health/ollama
+$headers = @{ Authorization = "Bearer your-local-secret-token" }
+Invoke-RestMethod http://127.0.0.1:8000/api/health/chat -Headers $headers
 ```
 
 ### 5. 启动前端
@@ -228,6 +250,18 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
+V1.1 手工验收：
+
+1. Token 认证：保持 `AUTH_ENABLED=true` 启动后端，首次打开前端输入 `.env` 中的 `APP_TOKEN`；错误 Token 应提示失败，正确 Token 进入聊天。把 `AUTH_ENABLED=false` 后重启后端，页面应直接进入。
+2. Ollama 诊断：左侧打开“Ollama 诊断”，确认地址为 `http://127.0.0.1:11434`，模型列表可见，`/api/tags` 结果为 `ok: true`；已配置默认模型时 `/api/chat` 测试应返回回复。
+3. 快捷提示词：点击输入框上方模板按钮，确认文本只写入输入框且可继续编辑；在“管理”里新增、编辑、禁用、删除模板，刷新页面后自定义模板仍在。
+4. 附件解析预览：上传 `txt`、`pdf` 或 Office 文件并发送消息，点击消息中的文件名，确认预览面板展示解析状态、字符数、截断标记、错误信息和解析文本；点击“重新解析”应刷新结果。
+5. 会话搜索：在左侧搜索框分别输入会话标题片段、消息正文片段和附件文件名片段，点击结果后应恢复对应会话。
+
+## 数据迁移
+
+后端启动时会在现有 SQLite 数据库上做 V1.1 兼容迁移：只为 `attachments` 表补充解析详情字段，并创建 `prompt_templates` 表和内置模板，不会清空 `data/app.db` 中的历史会话。升级前仍建议备份 `data/app.db`。
+
 ## 使用说明
 
 - 左侧新建/选择/删除会话。
@@ -241,4 +275,4 @@ cd backend
 ## 注意
 
 - 普通文本模型不能直接识图。只有模型名命中 `LOCAL_CHAT_VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。
-- 本项目是本地单用户 MVP，没有登录、云同步、向量库或复杂知识库。
+- 本项目仍是本地单用户工具。Token 只是一层本地访问门禁，不包含注册、用户管理、云同步、向量库或复杂知识库。

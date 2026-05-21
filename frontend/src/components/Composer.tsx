@@ -1,18 +1,19 @@
 import { Paperclip, Send, X } from "lucide-react";
-import { ChangeEvent, KeyboardEvent, useRef, useState } from "react";
+import { ChangeEvent, KeyboardEvent, useRef } from "react";
 import type { Attachment } from "../types/chat";
 import { AttachmentPreview } from "./AttachmentPreview";
 
 type Props = {
   attachments: Attachment[];
   disabled: boolean;
+  value: string;
+  onValueChange: (value: string) => void;
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: string) => void;
   onSend: (content: string) => void;
 };
 
-export function Composer({ attachments, disabled, onFiles, onRemoveAttachment, onSend }: Props) {
-  const [value, setValue] = useState("");
+export function Composer({ attachments, disabled, value, onValueChange, onFiles, onRemoveAttachment, onSend }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -24,7 +25,7 @@ export function Composer({ attachments, disabled, onFiles, onRemoveAttachment, o
     const content = value.trim();
     if (!content && attachments.length === 0) return;
     onSend(content || "请分析这些附件。");
-    setValue("");
+    onValueChange("");
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -44,7 +45,7 @@ export function Composer({ attachments, disabled, onFiles, onRemoveAttachment, o
         <textarea
           value={value}
           disabled={disabled}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder="输入问题，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片/文件，或拖拽到窗口"
         />

@@ -8,7 +8,16 @@ export type Attachment = {
   size: number;
   storage_path: string;
   status: string;
+  error_message: string | null;
+  is_truncated: boolean;
+  original_chars: number;
+  used_chars: number;
   created_at: string;
+  updated_at: string;
+};
+
+export type AttachmentDetail = Attachment & {
+  parsed_text_preview: string;
 };
 
 export type Message = {
@@ -38,4 +47,45 @@ export type OllamaModel = {
   model?: string;
   modified_at?: string;
   size?: number;
+};
+
+export type PromptTemplate = {
+  id: string;
+  name: string;
+  content: string;
+  category: string;
+  sort_order: number;
+  enabled: boolean;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationSearchResult = {
+  conversation_id: string;
+  title: string;
+  matched_type: "title" | "message" | "attachment";
+  matched_text: string;
+  updated_at: string;
+};
+
+export type HealthConfig = {
+  ollama_base_url: string;
+  default_model: string;
+  max_file_chars: number;
+  auth_enabled: boolean;
+};
+
+export type OllamaHealth = {
+  ok: boolean;
+  ollama_base_url: string;
+  tags_url?: string;
+  chat_url?: string;
+  status_code: number | null;
+  models?: OllamaModel[];
+  model?: string;
+  response?: unknown;
+  error?: string;
+  detail?: string;
+  url?: string;
 };

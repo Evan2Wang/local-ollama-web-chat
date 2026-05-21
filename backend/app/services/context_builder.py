@@ -18,8 +18,7 @@ def build_user_content(content: str, attachments: list[Attachment]) -> tuple[str
         if att.file_type != "file" or att.status != "parsed":
             continue
         text = read_parsed_text(att.parsed_text_path)
-        if len(text) > settings.max_file_chars:
-            text = text[: settings.max_file_chars]
+        if att.is_truncated:
             truncated = True
         file_sections.append(f"【文件：{att.filename}】\n{text}")
 

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.routers import health as health_router
 from app.routers import models as models_router
 from app.routers import chat as chat_router
+from app.config import settings
 
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aV0AAAAASUVORK5CYII="
@@ -55,6 +56,18 @@ def test_ollama_health_reports_tags_url_and_models(client: TestClient, monkeypat
     assert body["ollama_base_url"] == "http://127.0.0.1:11434"
     assert body["tags_url"] == "http://127.0.0.1:11434/api/tags"
     assert body["models"][0]["name"] == "fixture-model"
+
+
+def test_health_config_reports_local_runtime_settings(client: TestClient):
+    response = client.get("/api/health/config")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "default_model": settings.default_model,
+        "max_file_chars": settings.max_file_chars,
+        "auth_enabled": False,
+    }
 
 
 def test_streaming_chat_persists_history(client: TestClient, monkeypatch):
@@ -116,6 +129,25 @@ def test_text_attachment_is_parsed_and_sent_to_chat(client: TestClient, monkeypa
     assert "brief.md" in sent_content
     assert "launch color is amber" in sent_content
     assert detail["messages"][0]["attachments"][0]["filename"] == "brief.md"
+
+
+def test_text_attachment_reports_truncation_metadata(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "max_file_chars", 5)
+    conversation_id = create_conversation(client)
+
+    upload = client.post(
+        "/api/attachments",
+        data={"conversation_id": conversation_id},
+        files=[("files", ("long-note.txt", b"123456789", "text/plain"))],
+    )
+    attachment = upload.json()[0]
+    detail = client.get(f"/api/attachments/{attachment['id']}").json()
+
+    assert upload.status_code == 200
+    assert detail["parsed_text_preview"] == "12345"
+    assert detail["original_chars"] == 9
+    assert detail["used_chars"] == 5
+    assert detail["is_truncated"] is True
 
 
 def test_vision_attachment_becomes_ollama_image_payload(client: TestClient, monkeypatch):
@@ -187,3 +219,90 @@ def test_chat_rejects_attachment_from_another_conversation(client: TestClient):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "附件不属于当前会话"
+
+
+def test_token_auth_protects_api_but_leaves_config_and_ollama_health_public(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "auth_enabled", True)
+    monkeypatch.setattr(settings, "app_token", "test-token")
+
+    async def fake_tags():
+        return {"models": []}
+
+    monkeypatch.setattr(health_router, "get_tags", fake_tags)
+
+    assert client.get("/api/health/config").status_code == 200
+    assert client.get("/api/health/ollama").status_code == 200
+    assert client.get("/api/conversations").status_code == 401
+    assert client.post("/api/auth/check", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/conversations", headers={"Authorization": "Bearer test-token"}).status_code == 200
+
+
+def test_prompt_template_lifecycle(client: TestClient):
+    created = client.post(
+        "/api/prompt-templates",
+        json={"name": "验收模板", "content": "请读取附件", "category": "测试", "sort_order": 99, "enabled": True},
+    )
+    template_id = created.json()["id"]
+
+    updated = client.patch(
+        f"/api/prompt-templates/{template_id}",
+        json={"name": "验收模板-已改", "content": "请提取结论", "enabled": False},
+    )
+    listed = client.get("/api/prompt-templates").json()
+    deleted = client.delete(f"/api/prompt-templates/{template_id}")
+
+    assert created.status_code == 200
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "验收模板-已改"
+    assert updated.json()["content"] == "请提取结论"
+    assert updated.json()["enabled"] is False
+    assert any(item["id"] == template_id for item in listed)
+    assert deleted.status_code == 200
+    assert all(item["id"] != template_id for item in client.get("/api/prompt-templates").json())
+
+
+def test_attachment_detail_reparse_and_filename_search(client: TestClient):
+    conversation_id = create_conversation(client)
+    upload = client.post(
+        "/api/attachments",
+        data={"conversation_id": conversation_id},
+        files=[("files", ("searchable-note.txt", b"alpha search body", "text/plain"))],
+    )
+    attachment_id = upload.json()[0]["id"]
+
+    detail = client.get(f"/api/attachments/{attachment_id}").json()
+    reparsed = client.post(f"/api/attachments/{attachment_id}/reparse").json()
+    attachment_search = client.get("/api/conversations/search", params={"q": "searchable-note"}).json()
+
+    assert detail["parsed_text_preview"] == "alpha search body"
+    assert detail["original_chars"] == len("alpha search body")
+    assert reparsed["status"] == "parsed"
+    assert attachment_search[0]["conversation_id"] == conversation_id
+    assert attachment_search[0]["matched_type"] == "attachment"
+
+
+def test_conversation_search_matches_title_and_message(client: TestClient, monkeypatch):
+    conversation_id = create_conversation(client)
+
+    async def fake_stream_chat(model: str, messages: list[dict]):
+        async for chunk in stream_text(["beta answer detail"]):
+            yield chunk
+
+    monkeypatch.setattr(chat_router, "stream_chat", fake_stream_chat)
+    client.post(
+        "/api/chat",
+        json={
+            "conversation_id": conversation_id,
+            "model": "qwen3.5:2b",
+            "content": "title needle",
+            "attachment_ids": [],
+        },
+    )
+
+    title_search = client.get("/api/conversations/search", params={"q": "title needle"}).json()
+    message_search = client.get("/api/conversations/search", params={"q": "beta answer"}).json()
+
+    assert title_search[0]["conversation_id"] == conversation_id
+    assert title_search[0]["matched_type"] == "title"
+    assert message_search[0]["conversation_id"] == conversation_id
+    assert message_search[0]["matched_type"] == "message"

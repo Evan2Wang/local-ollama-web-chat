@@ -13,7 +13,12 @@ class AttachmentOut(BaseModel):
     size: int
     storage_path: str
     status: str
+    error_message: str | None
+    is_truncated: bool
+    original_chars: int
+    used_chars: int
     created_at: datetime
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -55,3 +60,45 @@ class ChatRequest(BaseModel):
     content: str
     attachment_ids: list[str] = []
     stream: bool = True
+
+
+class AttachmentDetail(AttachmentOut):
+    parsed_text_preview: str
+
+
+class PromptTemplateCreate(BaseModel):
+    name: str
+    content: str
+    category: str = "通用"
+    sort_order: int = 0
+    enabled: bool = True
+
+
+class PromptTemplateUpdate(BaseModel):
+    name: str | None = None
+    content: str | None = None
+    category: str | None = None
+    sort_order: int | None = None
+    enabled: bool | None = None
+
+
+class PromptTemplateOut(BaseModel):
+    id: str
+    name: str
+    content: str
+    category: str
+    sort_order: int
+    enabled: bool
+    is_builtin: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationSearchResult(BaseModel):
+    conversation_id: str
+    title: str
+    matched_type: str
+    matched_text: str
+    updated_at: datetime

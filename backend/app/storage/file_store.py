@@ -47,3 +47,9 @@ def public_upload_path(path: str) -> str:
         return f"/uploads/{rel.as_posix()}"
     except ValueError:
         return path
+
+
+def local_upload_path(path: str) -> str:
+    if path.startswith("/uploads/"):
+        return str(DATA_DIR / "uploads" / path.removeprefix("/uploads/"))
+    return path

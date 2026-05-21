@@ -1,18 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity } from "lucide-react";
 import {
   createConversation,
+  createPromptTemplate,
+  deletePromptTemplate,
+  fetchAttachment,
+  fetchHealthConfig,
+  fetchPromptTemplates,
   deleteConversation,
+  checkToken,
+  clearToken,
   fetchConversation,
   fetchConversations,
   fetchModels,
+  reparseAttachment,
+  saveToken,
+  searchConversations,
+  storedToken,
   streamChat,
+  updatePromptTemplate,
   uploadAttachments
 } from "../api/client";
+import { AttachmentDetailPanel } from "../components/AttachmentDetailPanel";
 import { ChatWindow } from "../components/ChatWindow";
 import { Composer } from "../components/Composer";
+import { DiagnosticsPanel } from "../components/DiagnosticsPanel";
+import { LoginPage } from "../components/LoginPage";
 import { ModelSelector } from "../components/ModelSelector";
+import { PromptTemplateBar } from "../components/PromptTemplateBar";
 import { Sidebar } from "../components/Sidebar";
-import type { Attachment, Conversation, Message, OllamaModel } from "../types/chat";
+import type { Attachment, AttachmentDetail, Conversation, ConversationSearchResult, Message, OllamaModel, PromptTemplate } from "../types/chat";
 
 const imageTypes = ["image/png", "image/jpeg", "image/webp"];
 
@@ -28,12 +45,20 @@ function makeLocalMessage(role: "user" | "assistant", content: string, conversat
 }
 
 export function Home() {
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [composerValue, setComposerValue] = useState("");
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetail | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([]);
+  const [view, setView] = useState<"chat" | "diagnostics">("chat");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
@@ -121,11 +146,36 @@ export function Home() {
   );
 
   useEffect(() => {
+    async function verifyAuth() {
+      try {
+        const config = await fetchHealthConfig();
+        if (!config.auth_enabled) {
+          setAuthorized(true);
+          return;
+        }
+        const token = storedToken();
+        if (!token) {
+          setAuthorized(false);
+          return;
+        }
+        await checkToken(token);
+        setAuthorized(true);
+      } catch {
+        clearToken();
+        setAuthorized(false);
+      }
+    }
+    verifyAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!authorized) return;
     async function boot() {
       try {
         const modelData = await fetchModels();
         setModels(modelData.models);
         setSelectedModel(modelData.default_model || modelData.models[0]?.name || "");
+        setTemplates(await fetchPromptTemplates());
         const list = await refreshConversations();
         if (list[0]) await loadConversation(list[0].id);
       } catch (err) {
@@ -133,7 +183,22 @@ export function Home() {
       }
     }
     boot();
-  }, [loadConversation, refreshConversations]);
+  }, [authorized, loadConversation, refreshConversations]);
+
+  useEffect(() => {
+    if (!authorized || !searchValue.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        setSearchResults(await searchConversations(searchValue));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [authorized, searchValue]);
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
@@ -178,13 +243,39 @@ export function Home() {
     };
   }, [handleFiles]);
 
+  const openAttachment = useCallback(async (id: string) => {
+    setError("");
+    try {
+      setAttachmentDetail(await fetchAttachment(id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  async function login(token: string) {
+    await checkToken(token);
+    saveToken(token);
+    setAuthorized(true);
+  }
+
+  async function refreshTemplates() {
+    setTemplates(await fetchPromptTemplates());
+  }
+
+  if (authorized === null) return <div className="boot-screen">正在读取本地配置...</div>;
+  if (!authorized) return <LoginPage onLogin={login} />;
+
   return (
     <div className="app-shell">
       <Sidebar
         conversations={conversations}
         activeId={activeId}
+        searchValue={searchValue}
+        searchResults={searchResults}
         onNew={handleNew}
+        onSearch={setSearchValue}
         onSelect={loadConversation}
+        onDiagnostics={() => setView("diagnostics")}
         onDelete={async (id) => {
           await deleteConversation(id);
           const next = await refreshConversations();
@@ -198,23 +289,71 @@ export function Home() {
         }}
       />
       <section className="main-panel">
-        <header className="topbar">
-          <div>
-            <strong>{activeConversation?.title || "新会话"}</strong>
-            <span>本地单用户 · SQLite 历史</span>
-          </div>
-          <ModelSelector models={models} value={selectedModel} onChange={setSelectedModel} />
-        </header>
-        {error && <div className="error-banner">{error}</div>}
-        <ChatWindow messages={messages} streaming={busy} />
-        <Composer
-          attachments={pendingAttachments}
-          disabled={busy}
-          onFiles={handleFiles}
-          onRemoveAttachment={(id) => setPendingAttachments((items) => items.filter((item) => item.id !== id))}
-          onSend={handleSend}
-        />
+        {view === "diagnostics" ? (
+          <DiagnosticsPanel onBack={() => setView("chat")} />
+        ) : (
+          <>
+            <header className="topbar">
+              <div>
+                <strong>{activeConversation?.title || "新会话"}</strong>
+                <span>本地单用户 · SQLite 历史</span>
+              </div>
+              <div className="topbar-tools">
+                <button className="subtle-button" type="button" onClick={() => setView("diagnostics")} title="Ollama 诊断">
+                  <Activity size={16} /> 诊断
+                </button>
+                <ModelSelector models={models} value={selectedModel} onChange={setSelectedModel} />
+              </div>
+            </header>
+            {error && <div className="error-banner">{error}</div>}
+            <ChatWindow messages={messages} streaming={busy} onOpenAttachment={openAttachment} />
+            <footer className="composer-stack">
+              <PromptTemplateBar
+                templates={templates}
+                onInsert={(content) => setComposerValue((value) => value ? `${value}\n\n${content}` : content)}
+                onCreate={async (draft) => {
+                  await createPromptTemplate({ ...draft, sort_order: templates.length + 1, enabled: true });
+                  await refreshTemplates();
+                }}
+                onUpdate={async (id, patch) => {
+                  const updated = await updatePromptTemplate(id, patch);
+                  setTemplates((items) => items.map((item) => item.id === id ? updated : item));
+                }}
+                onDelete={async (id) => {
+                  await deletePromptTemplate(id);
+                  await refreshTemplates();
+                }}
+              />
+              <Composer
+                attachments={pendingAttachments}
+                disabled={busy}
+                value={composerValue}
+                onValueChange={setComposerValue}
+                onFiles={handleFiles}
+                onRemoveAttachment={(id) => setPendingAttachments((items) => items.filter((item) => item.id !== id))}
+                onSend={handleSend}
+              />
+            </footer>
+          </>
+        )}
       </section>
+      {attachmentDetail && (
+        <AttachmentDetailPanel
+          attachment={attachmentDetail}
+          busy={attachmentBusy}
+          onClose={() => setAttachmentDetail(null)}
+          onReparse={async () => {
+            setAttachmentBusy(true);
+            try {
+              setAttachmentDetail(await reparseAttachment(attachmentDetail.id));
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            } finally {
+              setAttachmentBusy(false);
+            }
+          }}
+        />
+      )}
       {dragging && <div className="drop-overlay">松开以上传文件</div>}
     </div>
   );

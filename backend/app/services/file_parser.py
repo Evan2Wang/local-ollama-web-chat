@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 import fitz
@@ -6,6 +7,15 @@ from docx import Document
 from pptx import Presentation
 
 from app.config import DATA_DIR, settings
+
+
+@dataclass
+class ParseResult:
+    parsed_text_path: str | None
+    status: str
+    original_chars: int = 0
+    used_chars: int = 0
+    is_truncated: bool = False
 
 
 def parse_text_file(path: Path) -> str:
@@ -57,7 +67,7 @@ def parse_xlsx(path: Path) -> str:
     return "\n".join(lines)
 
 
-def parse_file(path: str, attachment_id: str) -> tuple[str | None, str]:
+def parse_file(path: str, attachment_id: str) -> ParseResult:
     source = Path(path)
     ext = source.suffix.lower()
     parsed_dir = DATA_DIR / "parsed"
@@ -74,11 +84,18 @@ def parse_file(path: str, attachment_id: str) -> tuple[str | None, str]:
     elif ext == ".xlsx":
         text = parse_xlsx(source)
     else:
-        return None, "unsupported"
+        return ParseResult(None, "unsupported")
 
+    used_text = text[: settings.max_file_chars]
     parsed_path = parsed_dir / f"{attachment_id}.txt"
-    parsed_path.write_text(text[: settings.max_file_chars * 2], encoding="utf-8")
-    return str(parsed_path), "parsed"
+    parsed_path.write_text(used_text, encoding="utf-8")
+    return ParseResult(
+        parsed_text_path=str(parsed_path),
+        status="parsed",
+        original_chars=len(text),
+        used_chars=len(used_text),
+        is_truncated=len(text) > len(used_text),
+    )
 
 
 def read_parsed_text(path: str | None) -> str:

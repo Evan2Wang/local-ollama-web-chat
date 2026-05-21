@@ -14,6 +14,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OLLAMA_BASE_URL", "LOCAL_CHAT_OLLAMA_BASE_URL"),
     )
     default_model: str = Field(default="qwen3.6:35b-a3b", validation_alias=AliasChoices("DEFAULT_MODEL", "LOCAL_CHAT_DEFAULT_MODEL"))
+    auth_enabled: bool = Field(default=True, validation_alias=AliasChoices("AUTH_ENABLED", "LOCAL_CHAT_AUTH_ENABLED"))
+    app_token: str = Field(default="your-local-secret-token", validation_alias=AliasChoices("APP_TOKEN", "LOCAL_CHAT_APP_TOKEN"))
     system_prompt: str = Field(default="你是一个本地中文助手，请用中文回答，结构清晰。", validation_alias=AliasChoices("SYSTEM_PROMPT", "LOCAL_CHAT_SYSTEM_PROMPT"))
     max_context_messages: int = Field(default=40, validation_alias=AliasChoices("MAX_CONTEXT_MESSAGES", "LOCAL_CHAT_MAX_CONTEXT_MESSAGES"))
     max_file_chars: int = Field(default=30000, validation_alias=AliasChoices("MAX_FILE_CHARS", "LOCAL_CHAT_MAX_FILE_CHARS"))

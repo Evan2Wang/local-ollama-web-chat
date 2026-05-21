@@ -11,6 +11,16 @@ def health():
     return {"ok": True}
 
 
+@router.get("/config")
+def health_config():
+    return {
+        "ollama_base_url": settings.ollama_base_url,
+        "default_model": settings.default_model,
+        "max_file_chars": settings.max_file_chars,
+        "auth_enabled": settings.auth_enabled,
+    }
+
+
 @router.get("/ollama")
 async def health_ollama():
     url = ollama_url("/api/tags")
@@ -35,7 +45,7 @@ async def health_ollama():
 @router.get("/chat")
 async def health_chat():
     url = ollama_url("/api/chat")
-    model = "qwen3.6:35b-a3b"
+    model = settings.default_model
     try:
         response = await chat_once(model=model, content="你好，简单回复一句。")
         return {

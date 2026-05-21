@@ -5,6 +5,7 @@ type Props = {
   attachments: Attachment[];
   removable?: boolean;
   onRemove?: (id: string) => void;
+  onOpen?: (id: string) => void;
 };
 
 function formatSize(size: number): string {
@@ -13,7 +14,7 @@ function formatSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function AttachmentPreview({ attachments, removable = false, onRemove }: Props) {
+export function AttachmentPreview({ attachments, removable = false, onRemove, onOpen }: Props) {
   if (!attachments.length) return null;
   return (
     <div className="attachments">
@@ -24,11 +25,19 @@ export function AttachmentPreview({ attachments, removable = false, onRemove }: 
               <img src={att.storage_path} alt={att.filename} />
             </a>
           ) : (
-            <FileText size={18} />
+            <button className="attachment-open" type="button" onClick={() => onOpen?.(att.id)} title="查看解析详情">
+              <FileText size={18} />
+            </button>
           )}
           <span className="attachment-meta">
             {att.file_type === "image" ? <Image size={14} /> : null}
-            <span title={att.filename}>{att.filename}</span>
+            {att.file_type === "file" && onOpen ? (
+              <button className="attachment-name" type="button" onClick={() => onOpen(att.id)} title="查看解析详情">
+                {att.filename}
+              </button>
+            ) : (
+              <span title={att.filename}>{att.filename}</span>
+            )}
             <small>{formatSize(att.size)} · {att.status}</small>
           </span>
           {removable && (
