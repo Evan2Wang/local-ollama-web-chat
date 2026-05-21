@@ -61,6 +61,27 @@ select {
   margin-top: 14px;
   min-height: 0;
   overflow: auto;
+  scrollbar-color: rgba(170, 190, 216, 0.44) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.conversation-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.conversation-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.conversation-list::-webkit-scrollbar-thumb {
+  background: rgba(170, 190, 216, 0.44);
+  border: 2px solid rgba(21, 32, 51, 0.82);
+  border-radius: 999px;
+}
+
+.conversation-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(196, 210, 229, 0.58);
 }
 
 .conversation-search {
@@ -163,12 +184,6 @@ select {
   justify-content: space-between;
   min-height: 64px;
   padding: 0 22px;
-}
-
-.topbar span {
-  color: #6b7888;
-  display: block;
-  font-size: 13px;
 }
 
 .topbar-tools {
@@ -323,7 +338,7 @@ select {
 
 .composer {
   background: #ffffff;
-  padding: 8px clamp(16px, 4vw, 64px) 18px;
+  padding: 4px clamp(16px, 4vw, 64px) 10px;
 }
 
 .composer-box {
@@ -339,10 +354,10 @@ select {
 
 .composer textarea {
   border: 0;
-  min-height: 58px;
+  min-height: 52px;
   max-height: 180px;
   outline: none;
-  padding: 16px 8px;
+  padding: 12px 8px;
   resize: vertical;
 }
 
@@ -359,7 +374,7 @@ select {
 
 .send-button,
 .attach-button {
-  min-height: 58px;
+  min-height: 52px;
 }
 
 .send-button {
@@ -527,14 +542,14 @@ select {
 .prompt-area {
   margin: 0 auto;
   max-width: calc(920px + clamp(32px, 8vw, 128px));
-  padding: 10px clamp(16px, 4vw, 64px) 0;
+  padding: 6px clamp(16px, 4vw, 64px) 0;
 }
 
 .prompt-buttons {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .prompt-buttons button,
@@ -548,7 +563,7 @@ select {
   display: inline-flex;
   flex: 0 0 auto;
   gap: 5px;
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 10px;
 }
 
@@ -736,10 +751,6 @@ select {
     gap: 8px;
     min-height: 48px;
     padding: 5px 14px;
-  }
-
-  .topbar span {
-    display: none;
   }
 
   .model-select,

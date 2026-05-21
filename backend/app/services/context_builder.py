@@ -48,15 +48,18 @@ def image_payloads(model: str, attachments: list[Attachment]) -> list[str]:
     return images
 
 
-def build_messages(db: Session, conversation: Conversation, current_content: str, attachments: list[Attachment], model: str) -> list[dict]:
-    history = list(
-        db.scalars(
-            select(Message)
-            .where(Message.conversation_id == conversation.id)
-            .order_by(Message.created_at.desc())
-            .limit(settings.max_context_messages)
-        )
-    )
+def build_messages(
+    db: Session,
+    conversation: Conversation,
+    current_content: str,
+    attachments: list[Attachment],
+    model: str,
+    before_message: Message | None = None,
+) -> list[dict]:
+    history_query = select(Message).where(Message.conversation_id == conversation.id)
+    if before_message:
+        history_query = history_query.where(Message.created_at < before_message.created_at)
+    history = list(db.scalars(history_query.order_by(Message.created_at.desc()).limit(settings.max_context_messages)))
     history.reverse()
     messages: list[dict] = [{"role": "system", "content": conversation.system_prompt}]
     for msg in history:

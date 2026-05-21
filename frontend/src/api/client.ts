@@ -130,3 +130,22 @@ export async function streamChat(
     onChunk(decoder.decode(value, { stream: true }));
   }
 }
+
+export async function streamRetry(
+  payload: { message_id: string; model: string },
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const response = await fetch("/api/chat/retry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ...payload, stream: true })
+  });
+  if (!response.ok || !response.body) throw new Error(await response.text());
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    onChunk(decoder.decode(value, { stream: true }));
+  }
+}

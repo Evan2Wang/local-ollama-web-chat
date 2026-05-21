@@ -18,6 +18,7 @@ import {
   searchConversations,
   storedToken,
   streamChat,
+  streamRetry,
   updatePromptTemplate,
   uploadAttachments
 } from "../api/client";
@@ -136,13 +137,41 @@ export function Home() {
           }
         );
         await refreshConversations();
+        await loadConversation(conversationId);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setBusy(false);
       }
     },
-    [busy, ensureConversation, pendingAttachments, refreshConversations, selectedModel]
+    [busy, ensureConversation, loadConversation, pendingAttachments, refreshConversations, selectedModel]
+  );
+
+  const handleRetry = useCallback(
+    async (message: Message) => {
+      if (busy || !activeId) return;
+      setError("");
+      setBusy(true);
+      const assistantMessage = makeLocalMessage("assistant", "", activeId);
+      setMessages((items) => [...items, assistantMessage]);
+      try {
+        await streamRetry(
+          { message_id: message.id, model: selectedModel },
+          (chunk) => {
+            setMessages((items) =>
+              items.map((item) => (item.id === assistantMessage.id ? { ...item, content: item.content + chunk } : item))
+            );
+          }
+        );
+        await refreshConversations();
+        await loadConversation(activeId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [activeId, busy, loadConversation, refreshConversations, selectedModel]
   );
 
   useEffect(() => {
@@ -296,7 +325,6 @@ export function Home() {
             <header className="topbar">
               <div>
                 <strong>{activeConversation?.title || "新会话"}</strong>
-                <span>本地单用户 · SQLite 历史</span>
               </div>
               <div className="topbar-tools">
                 <button className="subtle-button" type="button" onClick={() => setView("diagnostics")} title="Ollama 诊断">
@@ -306,7 +334,7 @@ export function Home() {
               </div>
             </header>
             {error && <div className="error-banner">{error}</div>}
-            <ChatWindow messages={messages} streaming={busy} onOpenAttachment={openAttachment} />
+            <ChatWindow messages={messages} streaming={busy} onOpenAttachment={openAttachment} onRetry={handleRetry} />
             <footer className="composer-stack">
               <PromptTemplateBar
                 templates={templates}

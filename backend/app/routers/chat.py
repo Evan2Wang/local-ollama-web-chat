@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
 from app.models import Attachment, Conversation, Message
-from app.schemas import ChatRequest
+from app.schemas import ChatRequest, ChatRetryRequest
 from app.services.context_builder import build_messages, build_user_content
 from app.services.ollama_client import model_supports_vision, stream_chat
 from app.services.title_service import title_from_content
@@ -47,6 +47,33 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     conversation_id = conversation.id
     db.commit()
 
+    return assistant_stream(conversation_id, model, messages)
+
+
+@router.post("/retry")
+async def retry_chat(payload: ChatRetryRequest, db: Session = Depends(get_db)):
+    user_message = db.get(Message, payload.message_id)
+    if not user_message or user_message.role != "user":
+        raise HTTPException(status_code=404, detail="可重试的用户消息不存在")
+
+    conversation = db.get(Conversation, user_message.conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    model = payload.model or conversation.model
+    attachments = list(db.scalars(select(Attachment).where(Attachment.message_id == user_message.id)))
+    user_content, _ = build_user_content(user_message.content, attachments)
+    if any(att.file_type == "image" for att in attachments) and not model_supports_vision(model):
+        user_content += "\n\n【系统提示】当前模型看起来不是视觉模型，图片已保存为附件，但不会直接发送给 Ollama 识图。"
+
+    conversation.model = model
+    conversation.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    messages = build_messages(db, conversation, user_content, attachments, model, before_message=user_message)
+    return assistant_stream(conversation.id, model, messages)
+
+
+def assistant_stream(conversation_id: str, model: str, messages: list[dict]) -> StreamingResponse:
     async def generate():
         full_text: list[str] = []
         try:

@@ -1,11 +1,21 @@
-import { Check, Copy, FileCode2 } from "lucide-react";
+import { Check, Copy, FileCode2, RotateCw } from "lucide-react";
 import { useRef, useState } from "react";
 import type { Message } from "../types/chat";
 import { copyMarkdown, copyRichText } from "../utils/clipboard";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-export function MessageBubble({ message, onOpenAttachment }: { message: Message; onOpenAttachment: (id: string) => void }) {
+export function MessageBubble({
+  message,
+  retryDisabled,
+  onOpenAttachment,
+  onRetry
+}: {
+  message: Message;
+  retryDisabled: boolean;
+  onOpenAttachment: (id: string) => void;
+  onRetry: (message: Message) => void;
+}) {
   const [copiedMode, setCopiedMode] = useState<"markdown" | "rich" | null>(null);
   const bubbleRef = useRef<HTMLElement>(null);
   const isUser = message.role === "user";
@@ -42,6 +52,11 @@ export function MessageBubble({ message, onOpenAttachment }: { message: Message;
           {!isUser && (
             <button type="button" className="icon-button" onClick={handleRichCopy} title="复制富文本">
               {copiedMode === "rich" ? <Check size={15} /> : <FileCode2 size={15} />}
+            </button>
+          )}
+          {isUser && !message.id.startsWith("local_") && (
+            <button type="button" className="icon-button" disabled={retryDisabled} onClick={() => onRetry(message)} title="重试这条消息">
+              <RotateCw size={15} />
             </button>
           )}
         </div>

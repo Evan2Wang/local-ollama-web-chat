@@ -94,6 +94,38 @@ def test_streaming_chat_persists_history(client: TestClient, monkeypatch):
     assert detail["title"] == "你好"
 
 
+def test_retry_streams_new_assistant_without_duplicating_user_message(client: TestClient, monkeypatch):
+    conversation_id = create_conversation(client)
+    retry_context: dict = {}
+
+    async def first_answer(model: str, messages: list[dict]):
+        async for chunk in stream_text(["首次回答"]):
+            yield chunk
+
+    monkeypatch.setattr(chat_router, "stream_chat", first_answer)
+    client.post(
+        "/api/chat",
+        json={"conversation_id": conversation_id, "model": "qwen3.5:2b", "content": "请重试我", "attachment_ids": []},
+    )
+    user_message_id = client.get(f"/api/conversations/{conversation_id}").json()["messages"][0]["id"]
+
+    async def retry_answer(model: str, messages: list[dict]):
+        retry_context["messages"] = messages
+        async for chunk in stream_text(["恢复后的回答"]):
+            yield chunk
+
+    monkeypatch.setattr(chat_router, "stream_chat", retry_answer)
+    response = client.post("/api/chat/retry", json={"message_id": user_message_id, "model": "qwen3.5:2b"})
+    detail = client.get(f"/api/conversations/{conversation_id}").json()
+
+    assert response.status_code == 200
+    assert response.text == "恢复后的回答"
+    assert [message["role"] for message in detail["messages"]] == ["user", "assistant", "assistant"]
+    assert detail["messages"][0]["content"] == "请重试我"
+    assert retry_context["messages"][-1]["content"] == "请重试我"
+    assert [message["role"] for message in retry_context["messages"]] == ["system", "user"]
+
+
 def test_text_attachment_is_parsed_and_sent_to_chat(client: TestClient, monkeypatch):
     conversation_id = create_conversation(client)
     upload = client.post(

@@ -43,6 +43,7 @@ export function Composer({ attachments, disabled, value, onValueChange, onFiles,
           <Paperclip className="composer-action-icon" />
         </button>
         <textarea
+          rows={1}
           value={value}
           disabled={disabled}
           onChange={(event) => onValueChange(event.target.value)}

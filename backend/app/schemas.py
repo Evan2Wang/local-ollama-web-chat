@@ -62,6 +62,12 @@ class ChatRequest(BaseModel):
     stream: bool = True
 
 
+class ChatRetryRequest(BaseModel):
+    message_id: str
+    model: str | None = None
+    stream: bool = True
+
+
 class AttachmentDetail(AttachmentOut):
     parsed_text_preview: str
 

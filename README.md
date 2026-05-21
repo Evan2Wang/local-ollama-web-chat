@@ -267,6 +267,7 @@ V1.1 手工验收：
 - 左侧新建/选择/删除会话。
 - 右上角选择 Ollama 模型。
 - 输入框中按 `Enter` 发送，按 `Shift+Enter` 换行。
+- 用户消息上的重试按钮可在 Ollama 恢复后重新生成回答，不会重复保存同一条提问。
 - 助手消息支持复制 Markdown 原文和富文本内容。
 - 直接 `Ctrl+V` 粘贴截图或文件。
 - 把 PDF、Word、PPT、Excel、CSV、Markdown、TXT 拖到页面即可上传。
