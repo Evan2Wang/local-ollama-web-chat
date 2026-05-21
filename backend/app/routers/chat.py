@@ -25,6 +25,8 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     attachments = list(db.scalars(select(Attachment).where(Attachment.id.in_(payload.attachment_ids)))) if payload.attachment_ids else []
     if len(attachments) != len(payload.attachment_ids):
         raise HTTPException(status_code=400, detail="部分附件不存在")
+    if any(att.conversation_id != conversation.id for att in attachments):
+        raise HTTPException(status_code=400, detail="附件不属于当前会话")
 
     user_content, _ = build_user_content(payload.content, attachments)
     if any(att.file_type == "image" for att in attachments) and not model_supports_vision(model):

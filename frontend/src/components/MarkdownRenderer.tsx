@@ -3,16 +3,23 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-type CodeProps = {
-  inline?: boolean;
+type MarkdownNodeProps = {
   className?: string;
   children?: React.ReactNode;
 };
 
-function CodeBlock({ inline, className, children }: CodeProps) {
+function nodeText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return nodeText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  }
+  return "";
+}
+
+function CodeBlock({ children }: MarkdownNodeProps) {
   const [copied, setCopied] = useState(false);
-  const text = String(children || "").replace(/\n$/, "");
-  if (inline) return <code className={className}>{children}</code>;
+  const text = nodeText(children).replace(/\n$/, "");
   return (
     <div className="code-wrap">
       <button
@@ -27,9 +34,7 @@ function CodeBlock({ inline, className, children }: CodeProps) {
       >
         {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>
-      <pre>
-        <code className={className}>{children}</code>
-      </pre>
+      <pre>{children}</pre>
     </div>
   );
 }
@@ -37,7 +42,13 @@ function CodeBlock({ inline, className, children }: CodeProps) {
 export function MarkdownRenderer({ content }: { content: string }) {
   return (
     <div className="markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ code: CodeBlock }}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code: ({ className, children }: MarkdownNodeProps) => <code className={className}>{children}</code>,
+          pre: CodeBlock
+        }}
+      >
         {content}
       </ReactMarkdown>
     </div>

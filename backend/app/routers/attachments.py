@@ -36,7 +36,10 @@ async def upload_attachments(
         db.add(attachment)
         db.flush()
         if file_type == "file":
-            parsed_path, status = parse_file(storage_path, attachment.id)
+            try:
+                parsed_path, status = parse_file(storage_path, attachment.id)
+            except Exception:
+                parsed_path, status = None, "failed"
             attachment.parsed_text_path = parsed_path
             attachment.status = status
         results.append(attachment)

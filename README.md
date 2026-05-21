@@ -216,6 +216,18 @@ http://192.168.1.23:5173
 
 如果局域网设备打不开页面，请检查 Windows 防火墙是否允许 Node.js 和 Python 访问专用网络，或手动放行端口 `5173`、`8000`、`11434`。
 
+## 功能测试
+
+MVP 功能测试矩阵见 `docs/functional-test-plan.md`。
+
+后端自动化功能测试：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest tests -q
+```
+
 ## 使用说明
 
 - 左侧新建/选择/删除会话。

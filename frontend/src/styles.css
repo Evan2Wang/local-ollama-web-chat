@@ -211,6 +211,12 @@ select {
   padding-left: 14px;
 }
 
+.markdown :not(pre) > code {
+  background: #e7edf5;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
 .code-wrap {
   background: #111827;
   border-radius: 8px;
