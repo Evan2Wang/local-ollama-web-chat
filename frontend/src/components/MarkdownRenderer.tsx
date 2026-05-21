@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { copyMarkdown } from "../utils/clipboard";
 
 type MarkdownNodeProps = {
   className?: string;
@@ -25,10 +26,11 @@ function CodeBlock({ children }: MarkdownNodeProps) {
       <button
         type="button"
         className="copy-code"
-        onClick={() => {
-          navigator.clipboard.writeText(text);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1200);
+        onClick={async () => {
+          if (await copyMarkdown(text)) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+          }
         }}
         title="复制代码"
       >

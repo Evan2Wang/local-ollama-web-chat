@@ -166,6 +166,12 @@ select {
   margin-bottom: 6px;
 }
 
+.message-copy-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+}
+
 .message.user {
   background: #ffffff;
   border: 1px solid #dce4ed;
