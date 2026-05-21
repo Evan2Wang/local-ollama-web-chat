@@ -28,7 +28,7 @@ export function Composer({ attachments, disabled, onFiles, onRemoveAttachment, o
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       submit();
     }
@@ -46,7 +46,7 @@ export function Composer({ attachments, disabled, onFiles, onRemoveAttachment, o
           disabled={disabled}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="输入问题，Ctrl+Enter 发送；可 Ctrl+V 粘贴图片/文件，或拖拽到窗口"
+          placeholder="输入问题，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片/文件，或拖拽到窗口"
         />
         <button type="button" className="send-button" disabled={disabled} onClick={submit} title="发送">
           {disabled ? <X className="composer-action-icon" /> : <Send className="composer-action-icon" />}

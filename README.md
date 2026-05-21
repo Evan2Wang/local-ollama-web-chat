@@ -220,7 +220,7 @@ http://192.168.1.23:5173
 
 - 左侧新建/选择/删除会话。
 - 右上角选择 Ollama 模型。
-- 输入框中按 `Ctrl+Enter` 发送。
+- 输入框中按 `Enter` 发送，按 `Shift+Enter` 换行。
 - 直接 `Ctrl+V` 粘贴截图或文件。
 - 把 PDF、Word、PPT、Excel、CSV、Markdown、TXT 拖到页面即可上传。
 - 文件过长时后端会截断，并要求模型在回答开头提示内容已截断。
