@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models import Attachment, Conversation, Message
 from app.schemas import ChatRequest
 from app.services.context_builder import build_messages, build_user_content
@@ -42,6 +42,7 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     db.flush()
     for att in attachments:
         att.message_id = user_message.id
+    conversation_id = conversation.id
     db.commit()
 
     async def generate():
@@ -55,10 +56,10 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
         finally:
             assistant_content = "".join(full_text).strip()
             if assistant_content:
-                write_db = next(get_db())
+                write_db = SessionLocal()
                 try:
-                    assistant = Message(conversation_id=conversation.id, role="assistant", content=assistant_content)
-                    conv = write_db.get(Conversation, conversation.id)
+                    assistant = Message(conversation_id=conversation_id, role="assistant", content=assistant_content)
+                    conv = write_db.get(Conversation, conversation_id)
                     if conv:
                         conv.updated_at = datetime.now(timezone.utc)
                     write_db.add(assistant)

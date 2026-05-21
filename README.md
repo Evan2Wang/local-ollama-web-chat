@@ -191,7 +191,7 @@ Mock 会返回 `qwen3.6:35b` 和 `mock-vision:latest` 两个模型。选择 `moc
 如果你有视觉模型，把模型名关键字加入 `.env`：
 
 ```env
-VISION_MODEL_KEYWORDS=llava,qwen-vl,qwen2-vl,minicpm-v
+VISION_MODEL_KEYWORDS=llava,qwen-vl,qwen2-vl,qwen3.5,minicpm-v
 ```
 
 ## 局域网访问

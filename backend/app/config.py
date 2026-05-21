@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     max_context_messages: int = Field(default=40, validation_alias=AliasChoices("MAX_CONTEXT_MESSAGES", "LOCAL_CHAT_MAX_CONTEXT_MESSAGES"))
     max_file_chars: int = Field(default=30000, validation_alias=AliasChoices("MAX_FILE_CHARS", "LOCAL_CHAT_MAX_FILE_CHARS"))
     vision_model_keywords: str = Field(
-        default="llava,bakllava,moondream,qwen-vl,qwen2-vl,qwen2.5vl,qwen2.5-vl,minicpm-v,gemma3",
+        default="llava,bakllava,moondream,qwen-vl,qwen2-vl,qwen2.5vl,qwen2.5-vl,qwen3.5,minicpm-v,gemma3",
         validation_alias=AliasChoices("VISION_MODEL_KEYWORDS", "LOCAL_CHAT_VISION_MODEL_KEYWORDS"),
     )
 

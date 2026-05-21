@@ -43,7 +43,7 @@ def image_payloads(model: str, attachments: list[Attachment]) -> list[str]:
     for att in attachments:
         path = Path(att.storage_path)
         if att.storage_path.startswith("/uploads/"):
-            path = DATA_DIR / att.storage_path.removeprefix("/uploads/")
+            path = DATA_DIR / "uploads" / att.storage_path.removeprefix("/uploads/")
         if att.file_type == "image" and path.exists():
             images.append(base64.b64encode(path.read_bytes()).decode("ascii"))
     return images
