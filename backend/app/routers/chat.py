@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -80,6 +81,8 @@ def assistant_stream(conversation_id: str, model: str, messages: list[dict]) -> 
             async for chunk in stream_chat(model, messages):
                 full_text.append(chunk)
                 yield chunk
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
             yield f"\n\n[调用 Ollama 失败：{exc}]"
         finally:

@@ -71,6 +71,32 @@ def test_health_config_reports_local_runtime_settings(client: TestClient):
     }
 
 
+def test_health_chat_falls_back_when_default_model_is_missing(client: TestClient, monkeypatch):
+    async def fake_tags():
+        return {"models": [{"name": "qwen3.5:2b", "model": "qwen3.5:2b"}]}
+
+    async def fake_chat_once(model: str, content: str, think: bool | None = None):
+        assert model == "qwen3.5:2b"
+        assert content == "你好，简单回复一句。"
+        assert think is False
+        return {"message": {"content": "你好。", "thinking": "thinking"}, "done_reason": "stop", "total_duration": 123}
+
+    monkeypatch.setattr(health_router, "get_tags", fake_tags)
+    monkeypatch.setattr(health_router, "chat_once", fake_chat_once)
+
+    response = client.get("/api/health/chat")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["ok"] is True
+    assert body["model"] == "qwen3.5:2b"
+    assert body["default_model"] == settings.default_model
+    assert body["response_preview"] == "你好。"
+    assert body["thinking_chars"] == len("thinking")
+    assert body["done_reason"] == "stop"
+    assert "未安装" in body["warning"]
+
+
 def test_streaming_chat_persists_history(client: TestClient, monkeypatch):
     conversation_id = create_conversation(client)
 
@@ -181,6 +207,25 @@ def test_text_attachment_reports_truncation_metadata(client: TestClient, monkeyp
     assert detail["original_chars"] == 9
     assert detail["used_chars"] == 5
     assert detail["is_truncated"] is True
+
+
+def test_text_attachment_can_disable_truncation(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "max_file_chars", 0)
+    conversation_id = create_conversation(client)
+
+    upload = client.post(
+        "/api/attachments",
+        data={"conversation_id": conversation_id},
+        files=[("files", ("full-note.txt", b"123456789", "text/plain"))],
+    )
+    attachment = upload.json()[0]
+    detail = client.get(f"/api/attachments/{attachment['id']}").json()
+
+    assert upload.status_code == 200
+    assert detail["parsed_text_preview"] == "123456789"
+    assert detail["original_chars"] == 9
+    assert detail["used_chars"] == 9
+    assert detail["is_truncated"] is False
 
 
 def test_vision_attachment_becomes_ollama_image_payload(client: TestClient, monkeypatch):

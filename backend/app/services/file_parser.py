@@ -86,7 +86,7 @@ def parse_file(path: str, attachment_id: str) -> ParseResult:
     else:
         return ParseResult(None, "unsupported")
 
-    used_text = text[: settings.max_file_chars]
+    used_text = text if settings.max_file_chars <= 0 else text[: settings.max_file_chars]
     parsed_path = parsed_dir / f"{attachment_id}.txt"
     parsed_path.write_text(used_text, encoding="utf-8")
     return ParseResult(

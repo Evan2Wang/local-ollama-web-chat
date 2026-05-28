@@ -4,11 +4,13 @@ import { MessageBubble } from "./MessageBubble";
 export function ChatWindow({
   messages,
   streaming,
+  retryDisabled,
   onOpenAttachment,
   onRetry
 }: {
   messages: Message[];
   streaming: boolean;
+  retryDisabled: boolean;
   onOpenAttachment: (id: string) => void;
   onRetry: (message: Message) => void;
 }) {
@@ -24,7 +26,7 @@ export function ChatWindow({
           <MessageBubble
             key={message.id}
             message={message}
-            retryDisabled={streaming}
+            retryDisabled={retryDisabled}
             onOpenAttachment={onOpenAttachment}
             onRetry={onRetry}
           />

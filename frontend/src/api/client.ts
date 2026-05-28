@@ -114,12 +114,14 @@ export async function checkToken(token: string): Promise<{ ok: boolean; auth_ena
 
 export async function streamChat(
   payload: { conversation_id: string; model: string; content: string; attachment_ids: string[] },
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ ...payload, stream: true })
+    body: JSON.stringify({ ...payload, stream: true }),
+    signal
   });
   if (!response.ok || !response.body) throw new Error(await response.text());
   const reader = response.body.getReader();
@@ -133,12 +135,14 @@ export async function streamChat(
 
 export async function streamRetry(
   payload: { message_id: string; model: string },
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const response = await fetch("/api/chat/retry", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ ...payload, stream: true })
+    body: JSON.stringify({ ...payload, stream: true }),
+    signal
   });
   if (!response.ok || !response.body) throw new Error(await response.text());
   const reader = response.body.getReader();

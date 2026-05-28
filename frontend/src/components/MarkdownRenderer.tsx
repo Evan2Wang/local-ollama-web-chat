@@ -1,7 +1,9 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { copyMarkdown } from "../utils/clipboard";
 
 type MarkdownNodeProps = {
@@ -45,7 +47,8 @@ export function MarkdownRenderer({ content }: { content: string }) {
   return (
     <div className="markdown">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           code: ({ className, children }: MarkdownNodeProps) => <code className={className}>{children}</code>,
           pre: CodeBlock

@@ -10,12 +10,15 @@
 - 会话搜索，支持标题、消息内容和附件文件名
 - 内置快捷提示词并支持自定义模板管理
 - Markdown、表格、代码块渲染和复制
+- 数学公式渲染，支持常见 LaTeX 行内/块级公式
 - `Ctrl+V` 粘贴图片/文件
 - 拖拽上传图片/文件
 - 支持 `txt`、`md`、`csv`、`pdf`、`docx`、`pptx`、`xlsx` 解析后参与对话
 - 文件附件支持解析文本预览、截断信息和重新解析
 - 支持 `png`、`jpg`、`jpeg`、`webp` 图片附件；视觉模型会以 Ollama `images` 数组发送
 - Ollama 诊断页展示配置、模型列表和 `/api/tags`、`/api/chat` 测试结果
+- 侧边栏支持收起/展开，小屏下可保留新建会话入口
+- 发送中支持停止生成；后端会串行调用 Ollama，避免本地模型被并发流式请求阻塞
 
 ## 目录
 
@@ -101,7 +104,7 @@ DEFAULT_MODEL=qwen3.6:35b-a3b
 OLLAMA_THINK=true
 AUTH_ENABLED=true
 APP_TOKEN=your-local-secret-token
-MAX_FILE_CHARS=30000
+MAX_FILE_CHARS=1000000
 ```
 
 注意：`OLLAMA_BASE_URL` 不要带 `/api`。后端会自动拼接：
@@ -112,6 +115,8 @@ POST {OLLAMA_BASE_URL}/api/chat
 ```
 
 如果你的模型名不是 `qwen3.6:35b-a3b`，把 `DEFAULT_MODEL` 改成你本机 `ollama list` 里显示的模型名。
+
+`MAX_FILE_CHARS` 控制解析后的单个文件最多送入模型的字符数，默认 `1000000`，用于尽量保留完整长文档。若确实希望完全不截断，可设为 `0`，但超出模型上下文窗口时 Ollama 仍可能无法完整处理。
 
 `OLLAMA_THINK=true` 会让后端向 Ollama 发送思考模式请求。支持思考的模型会先完成推理再返回最终回答；如需更快的非思考回复，可改为：
 
@@ -143,10 +148,12 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-健康检查：
+后端诊断接口：
 
 ```text
-http://127.0.0.1:8000/api/health
+http://127.0.0.1:8000/api/health/config
+http://127.0.0.1:8000/api/health/ollama
+http://127.0.0.1:8000/api/health/chat
 ```
 
 诊断接口：
@@ -215,7 +222,7 @@ Mock 会返回 `qwen3.6:35b` 和 `mock-vision:latest` 两个模型。选择 `moc
 
 ## 视觉模型配置
 
-普通文本模型不能直接识图。只有模型名命中 `LOCAL_CHAT_VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。
+普通文本模型不能直接识图。只有模型名命中 `VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。后端也兼容读取旧变量名 `LOCAL_CHAT_VISION_MODEL_KEYWORDS`。
 
 如果你有视觉模型，把模型名关键字加入 `.env`：
 
@@ -272,15 +279,33 @@ V1.1 手工验收：
 ## 使用说明
 
 - 左侧新建/选择/删除会话。
+- 左侧侧边栏可以收起，收起后保留新建会话和展开入口。
 - 右上角选择 Ollama 模型。
 - 输入框中按 `Enter` 发送，按 `Shift+Enter` 换行。
 - 用户消息上的重试按钮可在 Ollama 恢复后重新生成回答，不会重复保存同一条提问。
+- 生成中可以切换到其他会话查看历史，但为了保护本地 Ollama，同一时间只允许一个生成任务；底部发送按钮会变成“停止生成”。
 - 助手消息支持复制 Markdown 原文和富文本内容。
 - 直接 `Ctrl+V` 粘贴截图或文件。
 - 把 PDF、Word、PPT、Excel、CSV、Markdown、TXT 拖到页面即可上传。
-- 文件过长时后端会截断，并要求模型在回答开头提示内容已截断。
+- 文件超过 `MAX_FILE_CHARS` 时后端才会截断，并要求模型在回答开头提示内容已截断。
+
+## V1.1 界面基线
+
+- 主界面采用深色侧边栏 + 浅色聊天区。
+- 底部输入框和快捷提示词采用悬浮样式，二者宽度保持一致。
+- 输入区周围不放整条实心 footer 背景，聊天内容区域可以完整滚动到页面底部。
+- 小屏或低高度窗口下，快捷提示词可横向滚动，输入框和发送/停止按钮仍保持可用。
+
+## 运行架构约束
+
+- `OLLAMA_BASE_URL` 固定按不带 `/api` 的根地址配置，例如 `http://127.0.0.1:11434`。
+- 后端访问 Ollama 使用 `httpx.AsyncClient(trust_env=False)`，避免本机代理环境变量影响 `127.0.0.1` 请求。
+- `/api/chat` 和诊断 `/api/health/chat` 共享后端 Ollama chat 串行锁，同一进程内不会并发压测本地 Ollama。
+- `/api/health/chat` 只做非思考短探针，避免打开诊断页时触发长时间推理；正式聊天仍按 `OLLAMA_THINK` 配置执行。
+- 前端流式请求使用 `AbortController`，点击“停止生成”或页面断开时会释放当前流。
+- `OLLAMA_THINK=true` 会向 Ollama 请求思考模式；不支持该字段的模型通常会忽略它。
 
 ## 注意
 
-- 普通文本模型不能直接识图。只有模型名命中 `LOCAL_CHAT_VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。
+- 普通文本模型不能直接识图。只有模型名命中 `VISION_MODEL_KEYWORDS` 时，后端才会把图片 Base64 放进 Ollama `images` 数组。
 - 本项目仍是本地单用户工具。Token 只是一层本地访问门禁，不包含注册、用户管理、云同步、向量库或复杂知识库。

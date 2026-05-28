@@ -47,20 +47,38 @@ async def health_ollama():
 async def health_chat():
     url = ollama_url("/api/chat")
     model = settings.default_model
+    warning = None
     try:
-        response = await chat_once(model=model, content="你好，简单回复一句。")
-        return {
+        tags = await get_tags()
+        models = tags.get("models", [])
+        names = [item.get("name") or item.get("model") for item in models]
+        if model not in names and names:
+            warning = f"默认模型 {model} 未安装，已改用本机可用模型 {names[0]} 进行诊断。"
+            model = names[0]
+        response = await chat_once(model=model, content="你好，简单回复一句。", think=False)
+        message = response.get("message") if isinstance(response, dict) else {}
+        content = message.get("content", "") if isinstance(message, dict) else ""
+        thinking = message.get("thinking", "") if isinstance(message, dict) else ""
+        payload = {
             "ok": True,
             "ollama_base_url": settings.ollama_base_url,
             "chat_url": url,
             "status_code": 200,
             "model": model,
-            "response": response,
+            "default_model": settings.default_model,
+            "response_preview": content[:300],
+            "thinking_chars": len(thinking),
+            "total_duration": response.get("total_duration") if isinstance(response, dict) else None,
+            "done_reason": response.get("done_reason") if isinstance(response, dict) else None,
         }
+        if warning:
+            payload["warning"] = warning
+        return payload
     except Exception as exc:
         return {
             **ollama_error_payload(exc, url),
             "ollama_base_url": settings.ollama_base_url,
             "chat_url": url,
             "model": model,
+            "default_model": settings.default_model,
         }

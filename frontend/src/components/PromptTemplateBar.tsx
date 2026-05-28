@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { Plus, Settings2, Trash2 } from "lucide-react";
+import { FormEvent, ReactNode, useState } from "react";
+import { CheckSquare, FileText, Globe2, MoreHorizontal, Plus, Presentation, Search, Settings2, Table2, Trash2 } from "lucide-react";
 import type { PromptTemplate } from "../types/chat";
 
 type Draft = {
@@ -9,6 +9,16 @@ type Draft = {
 };
 
 const emptyDraft: Draft = { name: "", content: "", category: "自定义" };
+
+const templateIcons: Record<string, ReactNode> = {
+  文件总结: <FileText size={15} />,
+  提取表格: <Table2 size={15} />,
+  生成PPT大纲: <Presentation size={15} />,
+  压缩成领导汇报版: <FileText size={15} />,
+  翻译成中文: <Globe2 size={15} />,
+  提取待办事项: <CheckSquare size={15} />,
+  检查逻辑问题: <Search size={15} />
+};
 
 export function PromptTemplateBar({
   templates,
@@ -44,11 +54,12 @@ export function PromptTemplateBar({
             onClick={() => onInsert(item.content)}
             title={item.content}
           >
+            {templateIcons[item.name]}
             {item.name}
           </button>
         ))}
         <button className="prompt-manage" type="button" onClick={() => setManaging((value) => !value)} title="管理快捷提示词">
-          <Settings2 size={15} /> 管理
+          {managing ? <Settings2 size={15} /> : <MoreHorizontal size={15} />} {managing ? "管理中" : "更多"}
         </button>
       </div>
       {managing && (

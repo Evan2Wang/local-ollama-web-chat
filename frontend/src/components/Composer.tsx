@@ -15,10 +15,11 @@ type Props = {
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: string) => void;
   onSend: (content: string) => void;
+  onCancel?: () => void;
 };
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
-  { attachments, disabled, value, onValueChange, onFiles, onRemoveAttachment, onSend },
+  { attachments, disabled, value, onValueChange, onFiles, onRemoveAttachment, onSend, onCancel },
   ref
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +52,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     <footer className="composer">
       <AttachmentPreview attachments={attachments} removable onRemove={onRemoveAttachment} />
       <div className="composer-box">
-        <button type="button" className="icon-button attach-button" onClick={() => inputRef.current?.click()} title="上传附件">
+        <button type="button" className="icon-button attach-button" disabled={disabled} onClick={() => inputRef.current?.click()} title="上传附件">
           <Paperclip className="composer-action-icon" />
         </button>
         <textarea
@@ -63,7 +64,13 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           onKeyDown={onKeyDown}
           placeholder="输入问题，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片/文件，或拖拽到窗口"
         />
-        <button type="button" className="send-button" disabled={disabled} onClick={submit} title="发送">
+        <button
+          type="button"
+          className="send-button"
+          disabled={disabled && !onCancel}
+          onClick={disabled && onCancel ? onCancel : submit}
+          title={disabled && onCancel ? "停止生成" : "发送"}
+        >
           {disabled ? <X className="composer-action-icon" /> : <Send className="composer-action-icon" />}
         </button>
         <input

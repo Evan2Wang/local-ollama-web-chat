@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity } from "lucide-react";
 import {
   createConversation,
   createPromptTemplate,
@@ -51,7 +50,8 @@ export function Home() {
   const [selectedModel, setSelectedModel] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
+  const [loadedConversationIds, setLoadedConversationIds] = useState<Set<string>>(() => new Set());
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [composerValue, setComposerValue] = useState("");
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -60,14 +60,27 @@ export function Home() {
   const [searchValue, setSearchValue] = useState("");
   const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([]);
   const [view, setView] = useState<"chat" | "diagnostics">("chat");
-  const [busy, setBusy] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [busyConversationIds, setBusyConversationIds] = useState<Set<string>>(() => new Set());
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const composerRef = useRef<ComposerHandle>(null);
+  const bootedRef = useRef(false);
+  const streamControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   const activeConversation = useMemo(() => conversations.find((item) => item.id === activeId), [activeId, conversations]);
+  const messages = activeId ? messagesByConversation[activeId] || [] : [];
+  const activeBusy = activeId ? busyConversationIds.has(activeId) : false;
+  const hasActiveGeneration = busyConversationIds.size > 0;
   const focusComposer = useCallback(() => {
     window.requestAnimationFrame(() => composerRef.current?.focusInput());
+  }, []);
+
+  const setConversationMessages = useCallback((conversationId: string, updater: (messages: Message[]) => Message[]) => {
+    setMessagesByConversation((items) => ({
+      ...items,
+      [conversationId]: updater(items[conversationId] || [])
+    }));
   }, []);
 
   const refreshConversations = useCallback(async () => {
@@ -81,24 +94,41 @@ export function Home() {
     const created = await createConversation(selectedModel);
     setActiveId(created.id);
     setConversations((items) => [created, ...items]);
+    setConversationMessages(created.id, () => []);
+    setLoadedConversationIds((items) => new Set(items).add(created.id));
     return created.id;
-  }, [activeId, selectedModel]);
+  }, [activeId, selectedModel, setConversationMessages]);
+
+  const refreshConversationCache = useCallback(async (id: string) => {
+    const detail = await fetchConversation(id);
+    setConversations((items) => items.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)));
+    setConversationMessages(detail.id, () => detail.messages);
+    setLoadedConversationIds((items) => new Set(items).add(detail.id));
+    return detail;
+  }, [setConversationMessages]);
 
   const loadConversation = useCallback(async (id: string) => {
-    const detail = await fetchConversation(id);
-    setActiveId(detail.id);
-    setSelectedModel(detail.model);
-    setMessages(detail.messages);
+    setActiveId(id);
     setPendingAttachments([]);
-  }, []);
+    const cachedConversation = conversations.find((item) => item.id === id);
+    if (cachedConversation) setSelectedModel(cachedConversation.model);
+    if (loadedConversationIds.has(id)) {
+      return;
+    }
+    const detail = await fetchConversation(id);
+    setSelectedModel(detail.model);
+    setConversationMessages(detail.id, () => detail.messages);
+    setLoadedConversationIds((items) => new Set(items).add(detail.id));
+  }, [conversations, loadedConversationIds, setConversationMessages]);
 
   const handleNew = useCallback(async () => {
     const created = await createConversation(selectedModel);
     setConversations((items) => [created, ...items]);
     setActiveId(created.id);
-    setMessages([]);
+    setConversationMessages(created.id, () => []);
+    setLoadedConversationIds((items) => new Set(items).add(created.id));
     setPendingAttachments([]);
-  }, [selectedModel]);
+  }, [selectedModel, setConversationMessages]);
 
   const handleFiles = useCallback(
     async (files: File[]) => {
@@ -119,16 +149,23 @@ export function Home() {
 
   const handleSend = useCallback(
     async (content: string) => {
-      if (busy) return;
       setError("");
-      setBusy(true);
+      const conversationId = await ensureConversation();
+      if (busyConversationIds.size > 0) {
+        setError("当前已有会话正在生成，请等待完成后再发送。");
+        return;
+      }
+      setBusyConversationIds((items) => new Set(items).add(conversationId));
+      const controller = new AbortController();
+      streamControllersRef.current.set(conversationId, controller);
+      let assistantMessageId = "";
       try {
-        const conversationId = await ensureConversation();
         const currentAttachments = pendingAttachments;
         setPendingAttachments([]);
         const userMessage = makeLocalMessage("user", content, conversationId, currentAttachments);
         const assistantMessage = makeLocalMessage("assistant", "", conversationId);
-        setMessages((items) => [...items, userMessage, assistantMessage]);
+        assistantMessageId = assistantMessage.id;
+        setConversationMessages(conversationId, (items) => [...items, userMessage, assistantMessage]);
         await streamChat(
           {
             conversation_id: conversationId,
@@ -137,48 +174,84 @@ export function Home() {
             attachment_ids: currentAttachments.map((item) => item.id)
           },
           (chunk) => {
-            setMessages((items) =>
+            setConversationMessages(conversationId, (items) =>
               items.map((item) => (item.id === assistantMessage.id ? { ...item, content: item.content + chunk } : item))
             );
-          }
+          },
+          controller.signal
         );
         await refreshConversations();
-        await loadConversation(conversationId);
+        await refreshConversationCache(conversationId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setConversationMessages(conversationId, (items) =>
+            items.filter((item) => item.id !== assistantMessageId || item.content.trim().length > 0)
+          );
+          setError("已停止当前生成。");
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
-        setBusy(false);
+        streamControllersRef.current.delete(conversationId);
+        setBusyConversationIds((items) => {
+          const next = new Set(items);
+          next.delete(conversationId);
+          return next;
+        });
       }
     },
-    [busy, ensureConversation, loadConversation, pendingAttachments, refreshConversations, selectedModel]
+    [busyConversationIds, ensureConversation, pendingAttachments, refreshConversationCache, refreshConversations, selectedModel, setConversationMessages]
   );
 
   const handleRetry = useCallback(
     async (message: Message) => {
-      if (busy || !activeId) return;
+      const conversationId = message.conversation_id;
+      if (busyConversationIds.size > 0) {
+        setError("当前已有会话正在生成，请等待完成后再重试。");
+        return;
+      }
       setError("");
-      setBusy(true);
-      const assistantMessage = makeLocalMessage("assistant", "", activeId);
-      setMessages((items) => [...items, assistantMessage]);
+      setBusyConversationIds((items) => new Set(items).add(conversationId));
+      const controller = new AbortController();
+      streamControllersRef.current.set(conversationId, controller);
+      const assistantMessage = makeLocalMessage("assistant", "", conversationId);
+      setConversationMessages(conversationId, (items) => [...items, assistantMessage]);
       try {
         await streamRetry(
           { message_id: message.id, model: selectedModel },
           (chunk) => {
-            setMessages((items) =>
+            setConversationMessages(conversationId, (items) =>
               items.map((item) => (item.id === assistantMessage.id ? { ...item, content: item.content + chunk } : item))
             );
-          }
+          },
+          controller.signal
         );
         await refreshConversations();
-        await loadConversation(activeId);
+        await refreshConversationCache(conversationId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setConversationMessages(conversationId, (items) =>
+            items.filter((item) => item.id !== assistantMessage.id || item.content.trim().length > 0)
+          );
+          setError("已停止当前生成。");
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
-        setBusy(false);
+        streamControllersRef.current.delete(conversationId);
+        setBusyConversationIds((items) => {
+          const next = new Set(items);
+          next.delete(conversationId);
+          return next;
+        });
       }
     },
-    [activeId, busy, loadConversation, refreshConversations, selectedModel]
+    [busyConversationIds, refreshConversationCache, refreshConversations, selectedModel, setConversationMessages]
   );
+
+  const cancelGeneration = useCallback(() => {
+    streamControllersRef.current.forEach((controller) => controller.abort());
+  }, []);
 
   useEffect(() => {
     async function verifyAuth() {
@@ -204,7 +277,8 @@ export function Home() {
   }, []);
 
   useEffect(() => {
-    if (!authorized) return;
+    if (!authorized || bootedRef.current) return;
+    bootedRef.current = true;
     async function boot() {
       try {
         const modelData = await fetchModels();
@@ -305,16 +379,18 @@ export function Home() {
   if (!authorized) return <LoginPage onLogin={login} />;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <Sidebar
         conversations={conversations}
         activeId={activeId}
+        collapsed={sidebarCollapsed}
         searchValue={searchValue}
         searchResults={searchResults}
         onNew={handleNew}
         onSearch={setSearchValue}
         onSelect={loadConversation}
         onDiagnostics={() => setView("diagnostics")}
+        onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         onDelete={async (id) => {
           await deleteConversation(id);
           const next = await refreshConversations();
@@ -322,7 +398,6 @@ export function Home() {
             if (next[0]) await loadConversation(next[0].id);
             else {
               setActiveId(null);
-              setMessages([]);
             }
           }
         }}
@@ -337,14 +412,17 @@ export function Home() {
                 <strong>{activeConversation?.title || "新会话"}</strong>
               </div>
               <div className="topbar-tools">
-                <button className="subtle-button" type="button" onClick={() => setView("diagnostics")} title="Ollama 诊断">
-                  <Activity size={16} /> 诊断
-                </button>
                 <ModelSelector models={models} value={selectedModel} onChange={setSelectedModel} />
               </div>
             </header>
             {error && <div className="error-banner">{error}</div>}
-            <ChatWindow messages={messages} streaming={busy} onOpenAttachment={openAttachment} onRetry={handleRetry} />
+            <ChatWindow
+              messages={messages}
+              streaming={activeBusy}
+              retryDisabled={hasActiveGeneration}
+              onOpenAttachment={openAttachment}
+              onRetry={handleRetry}
+            />
             <footer className="composer-stack">
               <PromptTemplateBar
                 templates={templates}
@@ -368,12 +446,13 @@ export function Home() {
               <Composer
                 ref={composerRef}
                 attachments={pendingAttachments}
-                disabled={busy}
+                disabled={hasActiveGeneration}
                 value={composerValue}
                 onValueChange={setComposerValue}
                 onFiles={handleFiles}
                 onRemoveAttachment={(id) => setPendingAttachments((items) => items.filter((item) => item.id !== id))}
                 onSend={handleSend}
+                onCancel={hasActiveGeneration ? cancelGeneration : undefined}
               />
             </footer>
           </>
